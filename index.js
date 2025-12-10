@@ -10,8 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-const uri =
-  'mongodb+srv://mishown11:filA50pJCzGmc6w9@cluster0.wcellxl.mongodb.net/?appName=Cluster0';
+const uri = process.env.MONGO_URI;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -27,6 +26,20 @@ async function run() {
 
     const database = client.db('mishown11DB');
     const userCollection = database.collection('user');
+    // GET full user info by email
+    app.get('/users/:email', async (req, res) => {
+      const email = req.params.email;
+      try {
+        const user = await userCollection.findOne({ email: email });
+        if (user) {
+          res.status(200).json({ success: true, data: user });
+        } else {
+          res.status(404).json({ success: false, message: 'User not found' });
+        }
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
 
     // GET user role by email
     app.get('/users/role/:email', async (req, res) => {
