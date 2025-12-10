@@ -21,12 +21,101 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     console.log('MongoDB connected successfully!');
 
     const database = client.db('mishown11DB');
     const userCollection = database.collection('user');
     const mealsCollection = database.collection('meals');
+    // Inside your run() function, after your existing collections
+    const reviewsCollection = database.collection('reviews');
+    const favoritesCollection = database.collection('favorites');
+
+    // =========================
+    // Reviews Routes
+    // =========================
+  app.get('/meals/:id', async (req, res) => {
+    const id = req.params.id;
+    try {
+    
+      const { ObjectId } = require('mongodb');
+      const meal = await mealsCollection.findOne({ _id: new ObjectId(id) });
+      if (meal) {
+        res.status(200).json({ success: true, data: meal });
+      } else {
+        res.status(404).json({ success: false, message: 'Meal not found' });
+      }
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+
+
+    // GET all reviews for a specific meal
+    app.get('/reviews/:mealId', async (req, res) => {
+      const mealId = req.params.mealId;
+      try {
+        const reviews = await reviewsCollection
+          .find({ foodId: mealId })
+          .sort({ date: -1 }) // newest first
+          .toArray();
+        res.status(200).json({ success: true, data: reviews });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // POST a review
+    app.post('/reviews', async (req, res) => {
+      const review = req.body; // expects foodId, reviewerName, reviewerImage, rating, comment, date
+      try {
+        const result = await reviewsCollection.insertOne(review);
+        res.status(201).json({ success: true, data: result.ops[0] });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // =========================
+    // Favorites Routes
+    // =========================
+
+    // POST add meal to favorites
+    app.post('/favorites', async (req, res) => {
+      const favoriteMeal = req.body; // expects userEmail, mealId, mealName, chefId, chefName, price, addedTime
+
+      try {
+        // Check if already in favorites
+        const exists = await favoritesCollection.findOne({
+          userEmail: favoriteMeal.userEmail,
+          mealId: favoriteMeal.mealId,
+        });
+        if (exists) {
+          return res
+            .status(400)
+            .json({ success: false, message: 'Meal already in favorites' });
+        }
+
+        const result = await favoritesCollection.insertOne(favoriteMeal);
+        res.status(201).json({ success: true, data: result.ops[0] });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // Optional: GET all favorites of a user
+    app.get('/favorites/:email', async (req, res) => {
+      const email = req.params.email;
+      try {
+        const favorites = await favoritesCollection
+          .find({ userEmail: email })
+          .toArray();
+        res.status(200).json({ success: true, data: favorites });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
 
     // GET latest 6 meals
     app.get('/meals/latest', async (req, res) => {
