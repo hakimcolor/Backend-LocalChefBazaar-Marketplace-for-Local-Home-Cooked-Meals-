@@ -26,6 +26,60 @@ async function run() {
 
     const database = client.db('mishown11DB');
     const userCollection = database.collection('user');
+    const mealsCollection = database.collection('meals');
+
+    // GET latest 6 meals
+    app.get('/meals/latest', async (req, res) => {
+      try {
+        const latestMeals = await mealsCollection
+          .find()
+          .sort({ createdAt: -1 }) // newest first
+          .limit(6)
+          .toArray();
+
+        res.status(200).json({ success: true, data: latestMeals });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // GET all meals with optional price sorting
+    // Example: /meals?sort=asc or /meals?sort=desc
+    app.get('/meals', async (req, res) => {
+      try {
+        const sortQuery = req.query.sort;
+        let sortOption = {};
+
+        if (sortQuery === 'asc') {
+          sortOption = { price: 1 }; // ascending
+        } else if (sortQuery === 'desc') {
+          sortOption = { price: -1 }; // descending
+        }
+
+        const meals = await mealsCollection.find().sort(sortOption).toArray();
+        res.status(200).json({ success: true, data: meals });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // POST: Add a meal
+    app.post('/meals', async (req, res) => {
+      const meal = req.body;
+      meal.createdAt = new Date();
+
+      try {
+        const result = await mealsCollection.insertOne(meal);
+        res.status(201).json({
+          success: true,
+          message: 'Meal added successfully',
+          data: result,
+        });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
     // GET full user info by email
     app.get('/users/:email', async (req, res) => {
       const email = req.params.email;
