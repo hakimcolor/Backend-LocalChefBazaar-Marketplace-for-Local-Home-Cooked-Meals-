@@ -31,7 +31,118 @@ async function run() {
     const reviewsCollection = database.collection('reviews');
     const favoritesCollection = database.collection('favorites');
 
-    // শুধু লগিন ইউজারের রিভিউ
+    // GET: Logged-in user's meals
+    app.get('/user-meals/:email', async (req, res) => {
+      const email = req.params.email;
+
+      try {
+        const meals = await mealsCollection
+          .find({ userEmail: email }) 
+          .toArray();
+
+        res.send({
+          success: true,
+          data: meals,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({
+          success: false,
+          message: 'Failed to fetch meals',
+        });
+      }
+    });
+
+    //length for three one
+
+    app.get('/api/stats', async (req, res) => {
+      try {
+        const mealsCount = await mealsCollection.countDocuments();
+        const reviewsCount = await reviewsCollection.countDocuments();
+        const favoritesCount = await favoritesCollection.countDocuments();
+
+        res.json({
+          success: true,
+          mealsCount,
+          reviewsCount,
+          favoritesCount,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+      }
+    });
+
+    // GET latest 6 reviews for home page ok ......
+    app.get('/reviews/latest', async (req, res) => {
+      try {
+        const latestReviews = await reviewsCollection
+          .find()
+          .sort({ date: -1 })
+          .limit(6)
+          .toArray();
+
+        res.status(200).json({ success: true, data: latestReviews });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // Update a review by ID (PATCH)
+    app.patch('/reviewsup/:id', async (req, res) => {
+      const id = req.params.id;
+      const { rating, comment } = req.body;
+
+      try {
+        const updatedReview = await reviewsCollection.findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { $set: { rating, comment } },
+          { returnDocument: 'after' }
+        );
+
+        if (!updatedReview.value) {
+          return res.status(404).json({
+            success: false,
+            message: 'Review not found',
+          });
+        }
+
+        const review = updatedReview.value;
+        review._id = review._id.toString();
+
+        res.status(200).json({
+          success: true,
+          updatedReview: review,
+        });
+      } catch (err) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    // Delete a review by ID
+    app.delete('/reviews/:id', async (req, res) => {
+      const id = req.params.id;
+
+      try {
+        const result = await reviewsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount === 1) {
+          res
+            .status(200)
+            .json({ success: true, message: 'Review deleted successfully' });
+        } else {
+          res.status(404).json({ success: false, message: 'Review not found' });
+        }
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    //show all login user reviews
     app.get('/user-reviews/:email', async (req, res) => {
       const email = req.params.email;
       try {
@@ -45,9 +156,8 @@ async function run() {
       }
     });
 
-    // =========================
     // Reviews Routes
-    // =========================
+
     const { ObjectId } = require('mongodb');
 
     app.get('/mealsd/:id', async (req, res) => {
@@ -81,7 +191,7 @@ async function run() {
       try {
         const reviews = await reviewsCollection
           .find({ foodId: mealId })
-          .sort({ date: -1 }) // newest first
+          .sort({ date: -1 })
           .toArray();
         res.status(200).json({ success: true, data: reviews });
       } catch (err) {
@@ -105,16 +215,13 @@ async function run() {
       }
     });
 
-    // =========================
     // Favorites Routes
-    // =========================
 
     // POST add meal to favorites
     app.post('/favorites', async (req, res) => {
-      const favoriteMeal = req.body; // expects userEmail, mealId, mealName, chefId, chefName, price, addedTime
+      const favoriteMeal = req.body;
 
       try {
-        // Check if already in favorites
         const exists = await favoritesCollection.findOne({
           userEmail: favoriteMeal.userEmail,
           mealId: favoriteMeal.mealId,
@@ -180,16 +287,16 @@ async function run() {
     });
 
     // GET all meals with optional price sorting
-    // Example: /meals?sort=asc or /meals?sort=desc
+
     app.get('/meals', async (req, res) => {
       try {
         const sortQuery = req.query.sort;
         let sortOption = {};
 
         if (sortQuery === 'asc') {
-          sortOption = { price: 1 }; // ascending
+          sortOption = { price: 1 };
         } else if (sortQuery === 'desc') {
-          sortOption = { price: -1 }; // descending
+          sortOption = { price: -1 };
         }
 
         const meals = await mealsCollection.find().sort(sortOption).toArray();
@@ -246,10 +353,10 @@ async function run() {
       }
     });
 
-    // POST /users → add new user
+    // POST /users  add new user
     app.post('/users', async (req, res) => {
       const userInfo = req.body;
-      userInfo.role = 'buyer'; // default role
+      userInfo.role = 'buyer';
       userInfo.createdAt = new Date();
 
       try {
@@ -265,7 +372,7 @@ async function run() {
       res.send('Hello World from Express + MongoDB!');
     });
   } finally {
-    // Do not close client to keep the connection alive
+    
   }
 }
 
