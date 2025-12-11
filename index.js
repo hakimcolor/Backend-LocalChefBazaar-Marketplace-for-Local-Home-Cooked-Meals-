@@ -31,26 +31,49 @@ async function run() {
     const reviewsCollection = database.collection('reviews');
     const favoritesCollection = database.collection('favorites');
 
+    // শুধু লগিন ইউজারের রিভিউ
+    app.get('/user-reviews/:email', async (req, res) => {
+      const email = req.params.email;
+      try {
+        const userReviews = await reviewsCollection
+          .find({ reviewerEmail: email })
+          .sort({ date: -1 })
+          .toArray();
+        res.status(200).json({ success: true, data: userReviews });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
     // =========================
     // Reviews Routes
     // =========================
-  app.get('/meals/:id', async (req, res) => {
-    const id = req.params.id;
-    try {
-    
-      const { ObjectId } = require('mongodb');
-      const meal = await mealsCollection.findOne({ _id: new ObjectId(id) });
-      if (meal) {
-        res.status(200).json({ success: true, data: meal });
-      } else {
-        res.status(404).json({ success: false, message: 'Meal not found' });
+    const { ObjectId } = require('mongodb');
+
+    app.get('/mealsd/:id', async (req, res) => {
+      const id = req.params.id;
+
+      if (!ObjectId.isValid(id)) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid Meal ID' });
       }
-    } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
 
+      try {
+        const meal = await mealsCollection.findOne({ _id: new ObjectId(id) });
 
+        if (!meal) {
+          return res
+            .status(404)
+            .json({ success: false, message: 'Meal not found' });
+        }
+
+        res.status(200).json(meal);
+      } catch (err) {
+        console.log('MEAL DETAILS ERROR:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+      }
+    });
 
     // GET all reviews for a specific meal
     app.get('/reviews/:mealId', async (req, res) => {
@@ -68,10 +91,15 @@ async function run() {
 
     // POST a review
     app.post('/reviews', async (req, res) => {
-      const review = req.body; // expects foodId, reviewerName, reviewerImage, rating, comment, date
+      const review = req.body;
+
       try {
         const result = await reviewsCollection.insertOne(review);
-        res.status(201).json({ success: true, data: result.ops[0] });
+
+        res.status(201).json({
+          success: true,
+          data: { ...review, _id: result.insertedId }, // fixed
+        });
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
@@ -112,6 +140,25 @@ async function run() {
           .find({ userEmail: email })
           .toArray();
         res.status(200).json({ success: true, data: favorites });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    //for deleate my favorites mel from my favoriteMeals list
+    app.delete('/favorites/:id', async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await favoritesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount > 0) {
+          res.status(200).json({ success: true, message: 'Favorite removed' });
+        } else {
+          res
+            .status(404)
+            .json({ success: false, message: 'Favorite not found' });
+        }
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
