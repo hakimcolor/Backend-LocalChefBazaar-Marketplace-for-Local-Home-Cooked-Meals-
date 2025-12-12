@@ -596,15 +596,41 @@ async function run() {
     const mealsCollection = database.collection('meals');
     const reviewsCollection = database.collection('reviews');
     const favoritesCollection = database.collection('favorites');
-
+    const orderCollection = database.collection('order_collection');
     // Helper: normalize ObjectId fields to strings for front-end consistency
     const normalizeDoc = (doc) => {
       if (!doc) return doc;
       const copy = { ...doc };
       if (copy._id && copy._id.toString) copy._id = copy._id.toString();
-      if (copy.foodId && copy.foodId.toString) copy.foodId = copy.foodId.toString();
+      if (copy.foodId && copy.foodId.toString)
+        copy.foodId = copy.foodId.toString();
       return copy;
     };
+
+    //.....................oreder her..............
+    // POST: Create New Order
+    app.post('/orders', async (req, res) => {
+      try {
+        const orderData = req.body;
+        const orderCollection = client
+          .db('MealDB')
+          .collection('order_collection');
+
+        const result = await orderCollection.insertOne(orderData);
+
+        res.send({
+          success: true,
+          message: 'Order placed successfully!',
+          data: result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to place order',
+          error: error.message,
+        });
+      }
+    });
 
     // ------------------ Meals ------------------
 
@@ -666,7 +692,9 @@ async function run() {
         }
 
         if (result.deletedCount === 1) {
-          res.status(200).json({ success: true, message: 'Meal deleted successfully' });
+          res
+            .status(200)
+            .json({ success: true, message: 'Meal deleted successfully' });
         } else {
           res.status(404).json({ success: false, message: 'Meal not found' });
         }
@@ -680,7 +708,9 @@ async function run() {
       const email = req.params.email;
 
       try {
-        const meals = await mealsCollection.find({ userEmail: email }).toArray();
+        const meals = await mealsCollection
+          .find({ userEmail: email })
+          .toArray();
         const normalized = meals.map((m) => ({
           ...m,
           _id: m._id?.toString ? m._id.toString() : m._id,
@@ -688,7 +718,9 @@ async function run() {
         res.send({ success: true, data: normalized });
       } catch (error) {
         console.error('GET /user-meals error:', error);
-        res.status(500).send({ success: false, message: 'Failed to fetch meals' });
+        res
+          .status(500)
+          .send({ success: false, message: 'Failed to fetch meals' });
       }
     });
 
@@ -751,14 +783,18 @@ async function run() {
       const id = req.params.id;
 
       if (!ObjectId.isValid(id)) {
-        return res.status(400).json({ success: false, message: 'Invalid Meal ID' });
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid Meal ID' });
       }
 
       try {
         const meal = await mealsCollection.findOne({ _id: new ObjectId(id) });
 
         if (!meal) {
-          return res.status(404).json({ success: false, message: 'Meal not found' });
+          return res
+            .status(404)
+            .json({ success: false, message: 'Meal not found' });
         }
 
         meal._id = meal._id.toString();
@@ -789,7 +825,10 @@ async function run() {
     app.get('/reviews/:mealId', async (req, res) => {
       const mealId = req.params.mealId;
       try {
-        const reviews = await reviewsCollection.find({ foodId: mealId }).sort({ date: -1 }).toArray();
+        const reviews = await reviewsCollection
+          .find({ foodId: mealId })
+          .sort({ date: -1 })
+          .toArray();
         const normalized = reviews.map((r) => normalizeDoc(r));
         res.status(200).json({ success: true, data: normalized });
       } catch (err) {
@@ -834,7 +873,9 @@ async function run() {
 
         const found = await reviewsCollection.findOne(matchQuery);
         if (!found) {
-          return res.status(404).json({ success: false, message: 'Review not found' });
+          return res
+            .status(404)
+            .json({ success: false, message: 'Review not found' });
         }
 
         // update using the DB's actual _id (avoids type mismatch)
@@ -846,7 +887,9 @@ async function run() {
         );
 
         if (!updated.value) {
-          return res.status(500).json({ success: false, message: 'Update failed' });
+          return res
+            .status(500)
+            .json({ success: false, message: 'Update failed' });
         }
 
         const review = normalizeDoc(updated.value);
@@ -870,7 +913,9 @@ async function run() {
         }
 
         if (result.deletedCount === 1) {
-          res.status(200).json({ success: true, message: 'Review deleted successfully' });
+          res
+            .status(200)
+            .json({ success: true, message: 'Review deleted successfully' });
         } else {
           res.status(404).json({ success: false, message: 'Review not found' });
         }
@@ -883,7 +928,10 @@ async function run() {
     app.get('/user-reviews/:email', async (req, res) => {
       const email = req.params.email;
       try {
-        const userReviews = await reviewsCollection.find({ reviewerEmail: email }).sort({ date: -1 }).toArray();
+        const userReviews = await reviewsCollection
+          .find({ reviewerEmail: email })
+          .sort({ date: -1 })
+          .toArray();
         const normalized = userReviews.map((r) => normalizeDoc(r));
         res.status(200).json({ success: true, data: normalized });
       } catch (err) {
@@ -903,11 +951,18 @@ async function run() {
           mealId: favoriteMeal.mealId,
         });
         if (exists) {
-          return res.status(400).json({ success: false, message: 'Meal already in favorites' });
+          return res
+            .status(400)
+            .json({ success: false, message: 'Meal already in favorites' });
         }
 
         const result = await favoritesCollection.insertOne(favoriteMeal);
-        res.status(201).json({ success: true, data: { ...favoriteMeal, _id: result.insertedId.toString() } });
+        res
+          .status(201)
+          .json({
+            success: true,
+            data: { ...favoriteMeal, _id: result.insertedId.toString() },
+          });
       } catch (err) {
         console.error('POST /favorites error:', err);
         res.status(500).json({ success: false, error: err.message });
@@ -917,7 +972,9 @@ async function run() {
     app.get('/favorites/:email', async (req, res) => {
       const email = req.params.email;
       try {
-        const favorites = await favoritesCollection.find({ userEmail: email }).toArray();
+        const favorites = await favoritesCollection
+          .find({ userEmail: email })
+          .toArray();
         const normalized = favorites.map((f) => normalizeDoc(f));
         res.status(200).json({ success: true, data: normalized });
       } catch (err) {
@@ -933,7 +990,9 @@ async function run() {
       try {
         let result;
         if (typeof id === 'string' && ObjectId.isValid(id)) {
-          result = await favoritesCollection.deleteOne({ _id: new ObjectId(id) });
+          result = await favoritesCollection.deleteOne({
+            _id: new ObjectId(id),
+          });
         } else {
           result = await favoritesCollection.deleteOne({ _id: id });
         }
@@ -941,7 +1000,9 @@ async function run() {
         if (result.deletedCount > 0) {
           res.status(200).json({ success: true, message: 'Favorite removed' });
         } else {
-          res.status(404).json({ success: false, message: 'Favorite not found' });
+          res
+            .status(404)
+            .json({ success: false, message: 'Favorite not found' });
         }
       } catch (err) {
         console.error('DELETE /favorites error:', err);
@@ -958,7 +1019,9 @@ async function run() {
         if (user) {
           return res.status(200).json({ success: true, data: user });
         } else {
-          return res.status(404).json({ success: false, message: 'User not found' });
+          return res
+            .status(404)
+            .json({ success: false, message: 'User not found' });
         }
       } catch (err) {
         console.error('GET /users/:email error:', err);
@@ -973,7 +1036,9 @@ async function run() {
         if (user) {
           return res.status(200).json({ success: true, role: user.role });
         } else {
-          return res.status(404).json({ success: false, message: 'User not found' });
+          return res
+            .status(404)
+            .json({ success: false, message: 'User not found' });
         }
       } catch (err) {
         console.error('GET /users/role/:email error:', err);
@@ -988,7 +1053,15 @@ async function run() {
 
       try {
         const result = await userCollection.insertOne(userInfo);
-        res.status(201).json({ success: true, data: { ...userInfo, _id: result.insertedId?.toString?.() || result.insertedId } });
+        res
+          .status(201)
+          .json({
+            success: true,
+            data: {
+              ...userInfo,
+              _id: result.insertedId?.toString?.() || result.insertedId,
+            },
+          });
       } catch (err) {
         console.error('POST /users error:', err);
         res.status(500).json({ success: false, error: err.message });
