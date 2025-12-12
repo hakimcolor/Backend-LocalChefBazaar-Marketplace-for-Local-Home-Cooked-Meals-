@@ -1,4 +1,3 @@
-
 // const express = require('express');
 // const cors = require('cors');
 // require('dotenv').config();
@@ -607,15 +606,157 @@ async function run() {
       return copy;
     };
 
+    // -------------------------------
+    // Update Order Status (Cancel / Accept / Deliver)
+    // -------------------------------
+    app.patch('/update-order-status/:id', async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { orderStatus } = req.body;
+
+        // Check if valid status
+        const validStatus = ['pending', 'cancelled', 'accepted', 'delivered'];
+        if (!validStatus.includes(orderStatus)) {
+          return res.send({
+            success: false,
+            message: 'Invalid order status',
+          });
+        }
+
+        // Update order
+        const result = await orderCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { orderStatus } }
+        );
+
+        if (result.modifiedCount > 0) {
+          return res.send({
+            success: true,
+            message: `Order ${orderStatus} successfully`,
+            result,
+          });
+        }
+
+        res.send({
+          success: false,
+          message: 'Order status not updated',
+        });
+      } catch (error) {
+        console.error('Update order status error:', error);
+        res.status(500).send({
+          success: false,
+          message: 'Server error while updating order status',
+        });
+      }
+    });
+
     //.....................oreder her..............
-    // POST: Create New Order
+    // Orders API
+    // GET: Orders of logged-in user
+    app.get('/orders/:userEmail', async (req, res) => {
+      const email = req.params.userEmail;
+
+      try {
+        const orders = await orderCollection
+          .find({ userEmail: email })
+          .sort({ orderTime: -1 })
+          .toArray();
+
+        // Normalize _id and dates
+        const normalizedOrders = orders.map((order) => ({
+          ...order,
+          _id: order._id.toString(),
+          orderTime: order.orderTime
+            ? new Date(order.orderTime).toISOString()
+            : null,
+        }));
+
+        res.status(200).json({ success: true, data: normalizedOrders });
+      } catch (err) {
+        console.error('GET /orders/:userEmail error:', err);
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // POST: Update Payment Status after successful Stripe Payment
+    app.post('/orders/:orderId/pay', async (req, res) => {
+      const { orderId } = req.params;
+      const { paymentInfo } = req.body; // payment details from Stripe
+
+      try {
+        let dbId;
+        if (ObjectId.isValid(orderId)) dbId = new ObjectId(orderId);
+        else dbId = orderId;
+
+        const updated = await orderCollection.findOneAndUpdate(
+          { _id: dbId },
+          { $set: { paymentStatus: 'paid', paymentInfo } },
+          { returnDocument: 'after' }
+        );
+
+        if (!updated.value) {
+          return res
+            .status(404)
+            .json({ success: false, message: 'Order not found' });
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'Payment successful',
+          order: updated.value,
+        });
+      } catch (err) {
+        console.error('POST /orders/:orderId/pay error:', err);
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // GET: Orders where user's meals match chefId in orders
+
+    app.get('/user-chef-orders/:email', async (req, res) => {
+      const email = req.params.email;
+
+      try {
+        // 1️⃣ ইউজারের mealsCollection থেকে meals বের করা
+        const userMeals = await mealsCollection
+          .find({ userEmail: email })
+          .toArray();
+
+        if (!userMeals.length) {
+          return res
+            .status(404)
+            .json({ success: false, message: 'No meals found for this user' });
+        }
+
+        // 2️⃣ meals থেকে chefId বের করা
+        const chefIds = userMeals.map((meal) => meal.chefId);
+
+        // 3️⃣ orderCollection থেকে মিল করা orders বের করা
+        const orders = await orderCollection
+          .find({ chefId: { $in: chefIds } })
+          .toArray();
+
+        // 4️⃣ Normalize
+        const normalizedOrders = orders.map((order) => ({
+          ...order,
+          _id: order._id?.toString(),
+          foodId: order.foodId?.toString(),
+          orderTime: order.orderTime
+            ? new Date(order.orderTime).toISOString()
+            : null,
+        }));
+
+        res.status(200).json({ success: true, data: normalizedOrders });
+      } catch (err) {
+        console.error('GET /user-chef-orders error:', err);
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // POST: Create Order
     app.post('/orders', async (req, res) => {
       try {
         const orderData = req.body;
-        const orderCollection = client
-          .db('MealDB')
-          .collection('order_collection');
-
         const result = await orderCollection.insertOne(orderData);
 
         res.send({
@@ -625,7 +766,6 @@ async function run() {
         });
       } catch (error) {
         res.status(500).send({
-          success: false,
           message: 'Failed to place order',
           error: error.message,
         });
@@ -957,12 +1097,10 @@ async function run() {
         }
 
         const result = await favoritesCollection.insertOne(favoriteMeal);
-        res
-          .status(201)
-          .json({
-            success: true,
-            data: { ...favoriteMeal, _id: result.insertedId.toString() },
-          });
+        res.status(201).json({
+          success: true,
+          data: { ...favoriteMeal, _id: result.insertedId.toString() },
+        });
       } catch (err) {
         console.error('POST /favorites error:', err);
         res.status(500).json({ success: false, error: err.message });
@@ -1053,15 +1191,13 @@ async function run() {
 
       try {
         const result = await userCollection.insertOne(userInfo);
-        res
-          .status(201)
-          .json({
-            success: true,
-            data: {
-              ...userInfo,
-              _id: result.insertedId?.toString?.() || result.insertedId,
-            },
-          });
+        res.status(201).json({
+          success: true,
+          data: {
+            ...userInfo,
+            _id: result.insertedId?.toString?.() || result.insertedId,
+          },
+        });
       } catch (err) {
         console.error('POST /users error:', err);
         res.status(500).json({ success: false, error: err.message });
