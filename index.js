@@ -605,6 +605,56 @@ async function run() {
         copy.foodId = copy.foodId.toString();
       return copy;
     };
+    //manage user page for admin  dashbord
+
+    // PATCH /users/fraud/:id
+    //PATCH /users/:id/status
+    app.patch('/users/:id/status', async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body; // expected: 'fraud'
+
+      if (!['fraud'].includes(status)) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid status' });
+      }
+
+      try {
+        const updatedUser = await userCollection.findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { $set: { status } },
+          { returnDocument: 'after' }
+        );
+
+        if (!updatedUser.value) {
+          return res
+            .status(404)
+            .json({ success: false, message: 'User not found' });
+        }
+
+        res
+          .status(200)
+          .json({
+            success: true,
+            message: 'User marked as fraud',
+            data: updatedUser.value,
+          });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+      }
+    });
+
+    // GET /users
+    app.get('/users', async (req, res) => {
+      try {
+        const users = await userCollection.find().toArray();
+        res.status(200).json({ success: true, data: users });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+      }
+    });
 
     // -------------------------------
     // Update Order Status (Cancel / Accept / Deliver)
