@@ -569,7 +569,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 const app = express();
 
@@ -605,6 +605,177 @@ async function run() {
         copy.foodId = copy.foodId.toString();
       return copy;
     };
+
+    //  Platform Statistics Page (Private)
+    // Delivered Orders Count API
+    app.get('/orders/delivered/count', async (req, res) => {
+      try {
+        const deliveredCount = await orderCollection.countDocuments({
+          orderStatus: { $regex: /^delivered$/i }, // case-insensitive
+        });
+
+        res.json({
+          success: true,
+          deliveredOrders: deliveredCount,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to get delivered orders count',
+        });
+      }
+    });
+
+    // Pending Payment Count API
+    app.get('/orders/pending-payment/count', async (req, res) => {
+      try {
+        const pendingCount = await orderCollection.countDocuments({
+          paymentStatus: { $regex: /^pending$/i }, // case-insensitive
+        });
+
+        res.json({
+          success: true,
+          pendingPayments: pendingCount,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to get pending payment count',
+        });
+      }
+    });
+
+    // Total Users Count API
+    app.get('/users/count', async (req, res) => {
+      try {
+        const totalUsers = await userCollection.estimatedDocumentCount();
+        res.json({ success: true, totalUsers });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to get total users',
+        });
+      }
+    });
+
+    // total payment
+    app.get('/orders/paid/total', async (req, res) => {
+      try {
+        const orderCollection = database.collection('order_collection');
+
+        const result = await orderCollection
+          .aggregate([
+            {
+              $match: { paymentStatus: 'paid' },
+            },
+            {
+              $group: {
+                _id: null,
+                totalPaidAmount: { $sum: '$totalPrice' },
+                totalOrders: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result[0] || { totalPaidAmount: 0, totalOrders: 0 });
+      } catch (error) {
+        res.status(500).send({ message: 'Server Error' });
+      }
+    });
+
+    //PAYMENT  THROUGH strype
+
+    // ----------------- Stripe Payment -----------------
+
+    // Create Checkout Session
+
+    app.post('/create-checkout-session', async (req, res) => {
+      const { orderId, amount, email, name } = req.body;
+
+      try {
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'payment',
+          customer_email: email,
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: name || 'Food Order',
+                },
+                unit_amount: amount * 100,
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            orderId,
+          },
+          success_url: `http://localhost:5173/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `http://localhost:5173/dashbord/payment-cancel`,
+        });
+
+        res.json({ url: session.url });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Stripe session error' });
+      }
+    });
+
+    // Verify Payment
+    // app.get('/verify-payment/:sessionId', async (req, res) => {
+    //   const { sessionId } = req.params;
+    //   try {
+    //     const session = await stripe.checkout.sessions.retrieve(sessionId);
+    //     if (session.payment_status === 'paid') {
+    //       const orderId = session.metadata.orderId;
+    //       await orderCollection.updateOne(
+    //         { _id: new ObjectId(orderId) },
+    //         { $set: { paymentStatus: 'paid', paymentInfo: session } }
+    //       );
+    //       res.json({ success: true });
+    //     } else {
+    //       res.json({ success: false });
+    //     }
+    //   } catch (err) {
+    //     console.error('Verify payment error:', err);
+    //     res.status(500).json({ success: false, message: err.message });
+    //   }
+    // });
+    app.get('/verify-payment/:sessionId', async (req, res) => {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(
+          req.params.sessionId
+        );
+
+        if (session.payment_status === 'paid') {
+          const orderId = session.metadata.orderId;
+
+          await orderCollection.updateOne(
+            { _id: new ObjectId(orderId) },
+            {
+              $set: {
+                paymentStatus: 'paid',
+                paymentInfo: session,
+              },
+            }
+          );
+
+          return res.json({ success: true });
+        }
+
+        res.json({ success: false });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+      }
+    });
+
     //manage user page for admin  dashbord
 
     // PATCH /users/fraud/:id
@@ -632,13 +803,11 @@ async function run() {
             .json({ success: false, message: 'User not found' });
         }
 
-        res
-          .status(200)
-          .json({
-            success: true,
-            message: 'User marked as fraud',
-            data: updatedUser.value,
-          });
+        res.status(200).json({
+          success: true,
+          message: 'User marked as fraud',
+          data: updatedUser.value,
+        });
       } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -823,6 +992,23 @@ async function run() {
     });
 
     // ------------------ Meals ------------------
+
+    //chefId API  when the user role is chef ......
+
+    app.get('/chef-id/:email', async (req, res) => {
+      const email = req.params.email;
+
+      try {
+        // Meals collection এ chef-এর email field হয় userEmail
+        const meal = await mealsCollection.findOne({ userEmail: email });
+        if (!meal) return res.send({ chefId: null });
+
+        res.send({ chefId: meal.chefId || null });
+      } catch (err) {
+        console.error('GET /chef-id error:', err);
+        res.status(500).json({ chefId: null });
+      }
+    });
 
     app.put('/meals/:id', async (req, res) => {
       const rawId = req.params.id;
@@ -1200,6 +1386,87 @@ async function run() {
 
     // ------------------ Users ------------------
 
+    app.post('/role-request', async (req, res) => {
+      const { email, requestedRole } = req.body;
+      if (!['chef', 'admin'].includes(requestedRole))
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid role' });
+
+      try {
+        const updated = await userCollection.findOneAndUpdate(
+          { email },
+          { $set: { roleRequest: requestedRole } },
+          { returnDocument: 'after' }
+        );
+        res.status(200).json({
+          success: true,
+          message: 'Role request submitted',
+          data: updated.value,
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+    app.get('/role-requests', async (req, res) => {
+      try {
+        const requests = await userCollection
+          .find({ roleRequest: { $exists: true } })
+          .toArray();
+        res.status(200).json({ success: true, data: requests });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+    app.patch('/role-requests/:id/approve', async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const user = await userCollection.findOne({ _id: new ObjectId(id) });
+        if (!user || !user.roleRequest)
+          return res
+            .status(404)
+            .json({ success: false, message: 'No pending request' });
+
+        const updated = await userCollection.findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { $set: { role: user.roleRequest }, $unset: { roleRequest: '' } },
+          { returnDocument: 'after' }
+        );
+        res.status(200).json({
+          success: true,
+          message: 'Role updated successfully',
+          data: updated.value,
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    app.patch('/role-requests/:id/decline', async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const updated = await userCollection.findOneAndUpdate(
+          { _id: new ObjectId(id) },
+          { $unset: { roleRequest: '' } },
+          { returnDocument: 'after' }
+        );
+        res.status(200).json({
+          success: true,
+          message: 'Role request declined',
+          data: updated.value,
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    // email user
     app.get('/users/:email', async (req, res) => {
       const email = req.params.email;
       try {
@@ -1216,7 +1483,7 @@ async function run() {
         res.status(500).json({ success: false, error: err.message });
       }
     });
-
+    // aaaaaaaaaaaaa
     app.get('/users/role/:email', async (req, res) => {
       const email = req.params.email;
       try {
@@ -1236,7 +1503,7 @@ async function run() {
 
     app.post('/users', async (req, res) => {
       const userInfo = req.body;
-      userInfo.role = 'buyer';
+      userInfo.role = 'user';
       userInfo.createdAt = new Date();
 
       try {
