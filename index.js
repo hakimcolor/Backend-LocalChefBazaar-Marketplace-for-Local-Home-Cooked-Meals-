@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -150,8 +149,8 @@ async function run() {
           metadata: {
             orderId,
           },
-          success_url: `http://localhost:5173/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `http://localhost:5173/dashbord/payment-cancel`,
+          success_url: `${process.env.UI}/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.UI}/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
@@ -370,7 +369,7 @@ async function run() {
       const email = req.params.email;
 
       try {
-        // 1️⃣ ইউজারের mealsCollection থেকে meals বের করা
+      
         const userMeals = await mealsCollection
           .find({ userEmail: email })
           .toArray();
@@ -381,15 +380,14 @@ async function run() {
             .json({ success: false, message: 'No meals found for this user' });
         }
 
-        // 2️⃣ meals থেকে chefId বের করা
         const chefIds = userMeals.map((meal) => meal.chefId);
 
-        // 3️⃣ orderCollection থেকে মিল করা orders বের করা
+  
         const orders = await orderCollection
           .find({ chefId: { $in: chefIds } })
           .toArray();
 
-        // 4️⃣ Normalize
+  
         const normalizedOrders = orders.map((order) => ({
           ...order,
           _id: order._id?.toString(),
@@ -673,7 +671,7 @@ async function run() {
         if (rating !== undefined) updates.rating = Number(rating);
         if (comment !== undefined) updates.comment = comment;
 
-        // try to find the document by either ObjectId or string id
+       
         const queries = [];
         if (typeof id === 'string' && ObjectId.isValid(id)) {
           queries.push({ _id: new ObjectId(id) });
@@ -688,7 +686,7 @@ async function run() {
             .json({ success: false, message: 'Review not found' });
         }
 
-        // update using the DB's actual _id (avoids type mismatch)
+      
         const dbId = found._id;
         const updated = await reviewsCollection.findOneAndUpdate(
           { _id: dbId },
