@@ -973,7 +973,7 @@ async function run() {
       res.send('Hello World from Express + MongoDB!');
     });
   } finally {
-    // keep connection open; do not close client here so server can keep using it
+    
   }
 }
 
