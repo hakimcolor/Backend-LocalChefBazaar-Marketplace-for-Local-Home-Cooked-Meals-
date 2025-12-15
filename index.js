@@ -149,8 +149,8 @@ async function run() {
           metadata: {
             orderId,
           },
-          success_url: `${process.env.UI}/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.UI}/dashbord/payment-cancel`,
+          success_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
