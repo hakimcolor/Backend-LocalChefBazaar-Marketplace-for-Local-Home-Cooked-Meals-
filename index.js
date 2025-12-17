@@ -122,7 +122,7 @@ async function run() {
 
     //PAYMENT  THROUGH strype
 
-    // ----------------- Stripe Payment -----------------
+
 
     // Create Checkout Session
 
@@ -209,7 +209,6 @@ async function run() {
       }
     });
 
-    //manage user page for admin  dashbord
 
     // PATCH /users/fraud/:id
     //PATCH /users/:id/status
