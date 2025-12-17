@@ -149,8 +149,8 @@ async function run() {
           metadata: {
             orderId,
           },
-          success_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-cancel`,
+          success_url: `${process.env.UI}/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.UI}/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
@@ -658,6 +658,9 @@ async function run() {
     });
 
     // PATCH /reviewsup/:id — robust: match by ObjectId or string, then update using actual DB _id
+
+
+
     app.patch('/reviewsup/:id', async (req, res) => {
       const rawId = req.params.id;
       const id = typeof rawId === 'string' ? rawId.trim() : rawId;
@@ -702,6 +705,8 @@ async function run() {
         res.status(500).json({ success: false, error: err.message });
       }
     });
+
+
 
     app.delete('/reviews/:id', async (req, res) => {
       const rawId = req.params.id;
