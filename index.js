@@ -149,8 +149,8 @@ async function run() {
           metadata: {
             orderId,
           },
-          success_url: `http://localhost:5173/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `http://localhost:5173/dashbord/payment-cancel`,
+          success_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `https://localchefbazzaarmarketplacef.netlify.app/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
@@ -159,10 +159,6 @@ async function run() {
         res.status(500).json({ error: 'Stripe session error' });
       }
     });
-
-
-
-
 
     // Verify Payment
     // app.get('/verify-payment/:sessionId', async (req, res) => {
