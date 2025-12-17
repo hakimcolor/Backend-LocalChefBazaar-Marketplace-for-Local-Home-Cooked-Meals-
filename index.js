@@ -401,23 +401,59 @@ async function run() {
     });
 
     // POST: Create Order
-    app.post('/orders', async (req, res) => {
-      try {
-        const orderData = req.body;
-        const result = await orderCollection.insertOne(orderData);
+    // app.post('/orders', async (req, res) => {
+    //   try {
+    //     const orderData = req.body;
+    //     const result = await orderCollection.insertOne(orderData);
 
-        res.send({
-          success: true,
-          message: 'Order placed successfully!',
-          data: result,
-        });
-      } catch (error) {
-        res.status(500).send({
-          message: 'Failed to place order',
-          error: error.message,
-        });
-      }
+    //     res.send({
+    //       success: true,
+    //       message: 'Order placed successfully!',
+    //       data: result,
+    //     });
+    //   } catch (error) {
+    //     res.status(500).send({
+    //       message: 'Failed to place order',
+    //       error: error.message,
+    //     });
+    //   }
+    // });
+
+
+
+app.post('/orders', async (req, res) => {
+  try {
+    const orderData = req.body;
+    const userEmail = orderData.userEmail;
+
+    // 🚫 FRAUD USER CHECK
+    const isFraud = await isFraudUserByEmail(userEmail);
+    if (isFraud) {
+      return res.status(403).json({
+        success: false,
+        message: 'Fraud users cannot place orders',
+      });
+    }
+
+    const result = await orderCollection.insertOne(orderData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Order placed successfully!',
+      data: result,
     });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to place order',
+      error: error.message,
+    });
+  }
+});
+
+
+
+
 
     // ------------------ Meals ------------------
 
@@ -566,22 +602,53 @@ async function run() {
       }
     });
 
-    app.post('/meals', async (req, res) => {
-      const meal = req.body;
-      meal.createdAt = new Date();
+    // app.post('/meals', async (req, res) => {
+    //   const meal = req.body;
+    //   meal.createdAt = new Date();
 
-      try {
-        const result = await mealsCollection.insertOne(meal);
-        res.status(201).json({
-          success: true,
-          message: 'Meal added successfully',
-          data: { ...meal, _id: result.insertedId.toString() },
-        });
-      } catch (err) {
-        console.error('POST /meals error:', err);
-        res.status(500).json({ success: false, error: err.message });
-      }
+    //   try {
+    //     const result = await mealsCollection.insertOne(meal);
+    //     res.status(201).json({
+    //       success: true,
+    //       message: 'Meal added successfully',
+    //       data: { ...meal, _id: result.insertedId.toString() },
+    //     });
+    //   } catch (err) {
+    //     console.error('POST /meals error:', err);
+    //     res.status(500).json({ success: false, error: err.message });
+    //   }
+    // });
+
+app.post('/meals', async (req, res) => {
+  const meal = req.body;
+  meal.createdAt = new Date();
+
+  try {
+    const chefEmail = meal.userEmail;
+
+    // 🚫 FRAUD CHEF CHECK
+    const isFraudChef = await isFraudChefByEmail(chefEmail);
+    if (isFraudChef) {
+      return res.status(403).json({
+        success: false,
+        message: 'Fraud chefs cannot create meals',
+      });
+    }
+
+    const result = await mealsCollection.insertOne(meal);
+
+    res.status(201).json({
+      success: true,
+      message: 'Meal added successfully',
+      data: { ...meal, _id: result.insertedId.toString() },
     });
+  } catch (err) {
+    console.error('POST /meals error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 
     app.get('/mealsd/:id', async (req, res) => {
       const id = req.params.id;
