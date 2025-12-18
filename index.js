@@ -39,33 +39,37 @@ async function run() {
       return copy;
     };
     // GET: Check user role by email
-    app.get('/check-role/:email', async (req, res) => {
-      const email = req.params.email;
+   
 
-      try {
-        const user = await userCollection.findOne({ email });
+    
+app.get('/check-role/:email', async (req, res) => {
+  const email = req.params.email;
 
-        if (!user) {
-          return res.status(404).json({
-            success: false,
-            message: 'User not found',
-          });
-        }
+  try {
+    const user = await userCollection.findOne({ email });
 
-        res.status(200).json({
-          success: true,
-          email: user.email,
-          role: user.role || 'user', // default role 'user' if not set
-        });
-      } catch (err) {
-        console.error('GET /check-role/:email error:', err);
-        res.status(500).json({
-          success: false,
-          message: 'Server error',
-          error: err.message,
-        });
-      }
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      email: user.email,
+      role: user.role ? user.role.toLowerCase() : 'user',
     });
+  } catch (error) {
+    console.error('check-role error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+});
+
+
 
     //  Platform Statistics Page (Private)
     // Delivered Orders Count API
