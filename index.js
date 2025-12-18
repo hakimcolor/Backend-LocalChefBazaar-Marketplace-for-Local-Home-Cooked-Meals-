@@ -152,7 +152,7 @@ app.get('/check-role/:email', async (req, res) => {
       }
     });
 
-    //PAYMENT  THROUGH strype
+
 
     // Create Checkout Session
 
