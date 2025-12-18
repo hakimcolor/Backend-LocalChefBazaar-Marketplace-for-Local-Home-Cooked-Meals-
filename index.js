@@ -179,8 +179,8 @@ app.get('/check-role/:email', async (req, res) => {
           metadata: {
             orderId,
           },
-          success_url: `${process.env.UI}/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.UI}/dashbord/payment-cancel`,
+          success_url: `https://localchefbazzaarmarketplacd.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `https://localchefbazzaarmarketplacd.netlify.app/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
