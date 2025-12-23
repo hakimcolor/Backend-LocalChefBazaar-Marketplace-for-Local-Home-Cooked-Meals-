@@ -39,37 +39,33 @@ async function run() {
       return copy;
     };
     // GET: Check user role by email
-   
 
-    
-app.get('/check-role/:email', async (req, res) => {
-  const email = req.params.email;
+    app.get('/check-role/:email', async (req, res) => {
+      const email = req.params.email;
 
-  try {
-    const user = await userCollection.findOne({ email });
+      try {
+        const user = await userCollection.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: 'User not found',
+          });
+        }
 
-    res.status(200).json({
-      success: true,
-      email: user.email,
-      role: user.role ? user.role.toLowerCase() : 'user',
+        res.status(200).json({
+          success: true,
+          email: user.email,
+          role: user.role ? user.role.toLowerCase() : 'user',
+        });
+      } catch (error) {
+        console.error('check-role error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Server error',
+        });
+      }
     });
-  } catch (error) {
-    console.error('check-role error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-    });
-  }
-});
-
-
 
     //  Platform Statistics Page (Private)
     // Delivered Orders Count API
@@ -152,8 +148,6 @@ app.get('/check-role/:email', async (req, res) => {
       }
     });
 
-
-
     // Create Checkout Session
 
     app.post('/create-checkout-session', async (req, res) => {
@@ -179,8 +173,8 @@ app.get('/check-role/:email', async (req, res) => {
           metadata: {
             orderId,
           },
-          success_url: `https://localchefbazzaarmarketplacd.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `https://localchefbazzaarmarketplacd.netlify.app/dashbord/payment-cancel`,
+          success_url: `https://localchefbazaarbyhakimcolor.netlify.app/dashbord/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `https://localchefbazaarbyhakimcolor.netlify.app/dashbord/payment-cancel`,
         });
 
         res.json({ url: session.url });
