@@ -38,6 +38,28 @@ async function run() {
         copy.foodId = copy.foodId.toString();
       return copy;
     };
+
+    // GET all users with role 'chef'
+    app.get('/users/chefs', async (req, res) => {
+      try {
+        const chefs = await userCollection
+          .find({ role: 'chef' })
+          .project({ password: 0 }) // hide password
+          .toArray();
+
+        // normalize _id for frontend
+        const normalized = chefs.map((c) => ({
+          ...c,
+          _id: c._id.toString(),
+        }));
+
+        res.status(200).json({ success: true, data: normalized });
+      } catch (err) {
+        console.error('GET /users/chefs error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+      }
+    });
+
     // GET: Check user role by email
 
     app.get('/check-role/:email', async (req, res) => {
