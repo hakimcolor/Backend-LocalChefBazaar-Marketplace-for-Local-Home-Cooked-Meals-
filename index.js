@@ -59,6 +59,17 @@ async function run() {
       }
     });
 
+    // test mondogd
+    app.get('/test-db', async (req, res) => {
+      try {
+        await client.db().admin().ping();
+        res.send('MongoDB Connected');
+      } catch (err) {
+        console.error(err);
+        res.status(500).send(err.message);
+      }
+    });
+
     // GET all users with role 'chef'
     app.get('/users/chefs', async (req, res) => {
       try {
@@ -1030,7 +1041,7 @@ async function run() {
 
     // Test route
     app.get('/', (req, res) => {
-      res.send('Hello World from Express + MongoDB!');
+      res.send('Hello World from Express + MongoDB...........!');
     });
   } finally {
   }
